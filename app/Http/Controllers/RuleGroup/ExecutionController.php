@@ -35,6 +35,7 @@ use Illuminate\Contracts\View\Factory;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Collection;
 use Illuminate\View\View;
+use FireflyIII\Repositories\RuleGroup\RuleGroupRepositoryInterface;
 
 /**
  * Class ExecutionController
@@ -87,14 +88,67 @@ class ExecutionController extends Controller
         // add extra operators:
         $newRuleEngine->addOperator(['type' => 'account_id', 'value' => $accounts]);
 
-        // set rules:
-        // #10427, file rule group and not the set of rules.
-        $collection    = new Collection()->push($ruleGroup);
+    // set rules:
+    // #10427, file rule group and not the set of rules.
+    $collection    = new Collection();
+    $collection->push($ruleGroup);
         $newRuleEngine->setRuleGroups($collection);
         $newRuleEngine->fire();
 
         // Tell the user that the job is queued
         session()->flash('success', (string) trans('firefly.applied_rule_group_selection', ['title' => $ruleGroup->title]));
+
+        return redirect()->route('rules.index');
+    }
+
+    /**
+     * Show the form to execute ALL rule groups on a set of existing transactions.
+     */
+    public function selectAllTransactions()
+    {
+        $subTitle = (string) trans('firefly.apply_all_rules', [], null);
+
+        return view('rules.rule-group.select-all-transactions', compact('subTitle'));
+    }
+
+    /**
+     * Execute ALL rule groups on the selected set of transactions.
+     *
+     * @throws \Exception
+     */
+    public function executeAll(SelectTransactionsRequest $request): RedirectResponse
+    {
+        /** @var User $user */
+        $user = auth()->user();
+
+        // create new rule engine:
+        $newRuleEngine = app(RuleEngineInterface::class);
+        $newRuleEngine->setUser($user);
+
+        // add date operators.
+        if (null !== $request->get('start')) {
+            $startDate = new Carbon($request->get('start'));
+            $newRuleEngine->addOperator(['type' => 'date_after', 'value' => $startDate->format('Y-m-d')]);
+        }
+        if (null !== $request->get('end')) {
+            $endDate = new Carbon($request->get('end'));
+            $newRuleEngine->addOperator(['type' => 'date_before', 'value' => $endDate->format('Y-m-d')]);
+        }
+
+        // add extra operators: accounts
+        $accounts = implode(',', $request->get('accounts'));
+        $newRuleEngine->addOperator(['type' => 'account_id', 'value' => $accounts]);
+
+        // set rule groups to all active groups of the user.
+        /** @var RuleGroupRepositoryInterface $repo */
+        $repo = app(RuleGroupRepositoryInterface::class);
+        $repo->setUser($user);
+        $groups = $repo->getActiveGroups();
+
+        $newRuleEngine->setRuleGroups($groups);
+        $newRuleEngine->fire();
+
+        session()->flash('success', (string) trans('firefly.applied_all_rules'));
 
         return redirect()->route('rules.index');
     }

@@ -1240,6 +1240,9 @@ Route::group(
         Route::post('store', ['uses' => 'RuleGroup\CreateController@store', 'as' => 'store']);
         Route::post('update/{ruleGroup}', ['uses' => 'RuleGroup\EditController@update', 'as' => 'update']);
         Route::post('destroy/{ruleGroup}', ['uses' => 'RuleGroup\DeleteController@destroy', 'as' => 'destroy']);
+    // select and execute all rules controller
+    Route::get('select-all', ['uses' => 'RuleGroup\\ExecutionController@selectAllTransactions', 'as' => 'select-all-transactions']);
+    Route::post('execute-all', ['uses' => 'RuleGroup\\ExecutionController@executeAll', 'as' => 'execute-all']);
         Route::post('execute/{ruleGroup}', ['uses' => 'RuleGroup\ExecutionController@execute', 'as' => 'execute']);
     }
 );
